@@ -14,7 +14,7 @@
 /*---------------------------------------------------------------*/
 /*initialize variables-------------------------------------------*/
 /*---------------------------------------------------------------*/
-#define DCF_PIN 8           // NEEDS TO BE SET TO PIN 2  Connection pin to DCF 77 device
+#define DCF_PIN 2           // NEEDS TO BE SET TO PIN 2  Connection pin to DCF 77 device
 #define DCF_INTERRUPT 0    // Interrupt number associated with pin
 
 time_t time;
@@ -27,7 +27,10 @@ int i = 0;
 int j = 0;
 int intMin = 0;
 int intHour = 0;
-int codeDCF[] = {1,2,4,8,10,20,40};
+int intDay = 0;
+int intMonth = 0;
+int intYear = 0;
+int codeDCF[] = {1,2,4,8,10,20,40,80};
 int arrayLength = 59;
 int code[59];
 int flankUp = 0;
@@ -102,7 +105,7 @@ void loop() {
             code[j]=0;
           }
           i=0;
-        Serial.println("\n--------------------- ERROR DETECTED! ---------------------");
+        Serial.print("\n--------------------- ERROR DETECTED! ---------------------");
         };
       if (durationCycle > constNew)
       {
@@ -112,12 +115,23 @@ void loop() {
           
           intMin = decodeMin(code);
           intHour = decodeHour(code);
+          intDay = decodeDay(code);
+          intMonth = decodeMonth(code);
+          intYear = decodeYear(code);
 
-          Serial.print("Es ist : ");
+          Serial.print("Es ist der: ");
+          Serial.print(intDay);
+          Serial.print(".");
+          Serial.print(intMonth);
+          Serial.print(".");
+          Serial.print(intYear);
+          Serial.print(" um ");
           Serial.print(intHour);
           Serial.print(":");
           Serial.print(intMin);
-          Serial.println(" Uhr :-)");
+          Serial.print(" Uhr");
+          /*String str1 = String("Es ist der " + intDay + "." + intMonth + "." + intYear + " um " + intMin + ":" intHour + "Uhr");
+          Serial,println(str1);
           
           for(int j = 0; j < 59; j++) /*Code zurücksetzen*/
           {
@@ -126,7 +140,7 @@ void loop() {
           }
         flagNewMinute = true;
         i = 0;
-        Serial.print("\n------------------- New minute detected -------------------\t");
+        Serial.print("\n------------------- New minute detected -------------------");
         }
 
     Serial.print("\t\tCode: ");
@@ -181,4 +195,30 @@ int decodeHour(int code[59]){
     h = h+code[j+29]*codeDCF[j];
   }
   return h;
+}
+
+int decodeDay(int code[59]){
+  int d = 0;
+  for (int j=0;j<6;j++){
+    d = d+code[j+36]*codeDCF[j];
+  }
+  return d;
+}
+
+
+int decodeMonth(int code[59]){
+  int mth = 0;
+  for (int j=0;j<5;j++){
+    mth = mth+code[j+45]*codeDCF[j];
+  }
+  return mth;
+}
+
+int decodeYear(int code[59]){
+  int y = 0;
+  for (int j=0;j<8;j++){
+    y = y+code[j+50]*codeDCF[j];
+  }
+  y = y+2000;
+  return y;
 }
