@@ -7,18 +7,19 @@
 /*---------------------------------------------------------------*/
 /*include libraries----------------------------------------------*/
 /*---------------------------------------------------------------*/
-#include "DCF77.h"
 #include "Time.h"
 #include "Timezone.h"
 
 /*---------------------------------------------------------------*/
 /*initialize variables-------------------------------------------*/
 /*---------------------------------------------------------------*/
-#define DCF_PIN 2           // NEEDS TO BE SET TO PIN 2  Connection pin to DCF 77 device
-#define DCF_INTERRUPT 0    // Interrupt number associated with pin
+#define DCF_PIN 2           // Connection pin to DCF 77 device
 
 time_t time;
-DCF77 DCF = DCF77(DCF_PIN,DCF_INTERRUPT);
+
+bool Up = false;
+bool flagError = 0;
+bool flagNewMinute = 0;
 
 char time_s[9];
 char date_s[11];
@@ -28,37 +29,33 @@ int j = 0;
 int intMin = 0;
 int intHour = 0;
 int intDay = 0;
+int intWeekDay = 0;
 int intMonth = 0;
 int intYear = 0;
-int codeDCF[] = {1,2,4,8,10,20,40,80};
+int codeDCF[] = {1,2,4,8,10,20,40,80}; /*DCF77 decoding template*/
 int arrayLength = 59;
 int code[59];
-int flankUp = 0;
-int flankDown = 0;
-int PreviousflankUp;
-int typePulse = 0;       /* 0: LOW     1: HIGH*/
-int durationPulse = 0;   /* duration of sensed signal pulse*/
+int flankUp = 0;          /* 0: LOW     1: HIGH*/
+int flankDown = 0;        /* 0: LOW     1: HIGH*/
+int PreviousflankUp;      /* 0: LOW     1: HIGH*/
+int typePulse = 0;        /* 0: LOW     1: HIGH*/
+int durationPulse = 0;    /* duration of sensed signal pulse*/
 int durationCycle = 0;    /* duration of cycle between two rising flanks*/
-int constHigh = 200;   /* default value for HIGH signal*/
-int constLow = 100;    /* default value for LOW signal*/
-int constNew = 1500;   /* default value for detection of new minute*/
-bool Up = false;
-bool flagError = 0;
-bool flagNewMinute = 0;
+int constHigh = 200;      /* default value for HIGH signal*/
+int constLow = 100;       /* default value for LOW signal*/
+int constNew = 1500;      /* default value for detection of new minute*/
 
 /*---------------------------------------------------------------*/
 /*setup script---------------------------------------------------*/
 /*---------------------------------------------------------------*/
 void setup() {
   Serial.begin(9600); 
-  DCF.Start();
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(DCF_PIN, INPUT);
   Serial.println("Rebooting clock...");
 }
 
 /*---------------------------------------------------------------*/
-/*iloop script---------------------------------------------------*/
+/*loop script---------------------------------------------------*/
 /*---------------------------------------------------------------*/
 void loop() {
 
@@ -86,52 +83,41 @@ void loop() {
           }
         else if (durationPulse < 50)
         {
-          typePulse = 99;  
-        }
-        else
-        {
-          typePulse = 0;
-          };
-      
-        Up = false;
-      Serial.print("\tSignal: ");
-      Serial.print(typePulse);
-      time_t DCFtime = DCF.getTime(); // Nachschauen ob eine neue DCF77 Zeit vorhanden ist
-      if (typePulse == 99)
-      {
-        flagNewMinute = false;
-          for(int j = 0; j < 59; j++)
+          typePulse = 99;
+          flagNewMinute = false;
+          for(int j = 0; j < 59; j++) /*Reset Code*/
           {
             code[j]=0;
           }
           i=0;
         Serial.print("\n--------------------- ERROR DETECTED! ---------------------");
-        };
+        }
+        else
+        {
+          typePulse = 0;
+         };
+      
+        Up = false;
+      Serial.print("\tSignal: ");
+      Serial.print(typePulse);
       if (durationCycle > constNew)
       {
         if(flagNewMinute)
         {
-          Serial.println("\n----------------- Sucessful run -----------------");
+          Serial.println("\n---------------------- Sucessful run ----------------------");
           
-          intMin = decodeMin(code);
-          intHour = decodeHour(code);
-          intDay = decodeDay(code);
-          intMonth = decodeMonth(code);
-          intYear = decodeYear(code);
+          intMin = decodeDCF(code,21,7);
+          intHour = decodeDCF(code,29,6);
+          intDay = decodeDCF(code,36,6);
+          intWeekDay = decodeDCF(code,42,3);
+          intMonth = decodeDCF(code,45,5);
+          intYear = 2000+decodeDCF(code,50,8);
 
-          Serial.print("Es ist der: ");
-          Serial.print(intDay);
-          Serial.print(".");
-          Serial.print(intMonth);
-          Serial.print(".");
-          Serial.print(intYear);
-          Serial.print(" um ");
-          Serial.print(intHour);
-          Serial.print(":");
-          Serial.print(intMin);
-          Serial.print(" Uhr");
-          /*String str1 = String("Es ist der " + intDay + "." + intMonth + "." + intYear + " um " + intMin + ":" intHour + "Uhr");
-          Serial,println(str1);
+          setTime(intHour,intMin,0,intDay,intMonth,intYear);
+          Serial.print("Neue Zeit erhalten : ");
+          Serial.print(sprintTime()); 
+          Serial.print("  "); 
+          Serial.println(sprintDate());  
           
           for(int j = 0; j < 59; j++) /*Code zurücksetzen*/
           {
@@ -155,15 +141,7 @@ void loop() {
       };
     Serial.println();
     digitalWrite(LED_BUILTIN, LOW);
-            
-  if (DCFtime!=0)
-  {
-    setTime(DCFtime); //Neue Systemzeit setzen
-    Serial.print("Neue Zeit erhalten : "); //Ausgabe an seriell
-    Serial.print(sprintTime()); 
-    Serial.print("  "); 
-    Serial.println(sprintDate());   
-  } 
+ 
       }              
     }
   
@@ -181,44 +159,10 @@ char* sprintDate() {
   return date_s;
 }
 
-int decodeMin(int code[59]){
-  int m = 0;
-  for (int j=0;j<7;j++){
-     m = m + code[j+21]*codeDCF[j];
-  }
-  return m;
-}
-
-int decodeHour(int code[59]){
-  int h = 0;
-  for (int j=0;j<6;j++){
-    h = h+code[j+29]*codeDCF[j];
-  }
-  return h;
-}
-
-int decodeDay(int code[59]){
-  int d = 0;
-  for (int j=0;j<6;j++){
-    d = d+code[j+36]*codeDCF[j];
-  }
-  return d;
-}
-
-
-int decodeMonth(int code[59]){
-  int mth = 0;
-  for (int j=0;j<5;j++){
-    mth = mth+code[j+45]*codeDCF[j];
-  }
-  return mth;
-}
-
-int decodeYear(int code[59]){
-  int y = 0;
-  for (int j=0;j<8;j++){
-    y = y+code[j+50]*codeDCF[j];
-  }
-  y = y+2000;
-  return y;
+int decodeDCF(int code[59],int startBit,int nBit){
+  int res = 0;
+  for (int j=0;j<nBit;j++){
+    res=res+code[startBit+j]*codeDCF[j];
+    }
+  return res;
 }
