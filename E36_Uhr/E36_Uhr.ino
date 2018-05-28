@@ -1,10 +1,8 @@
 /*
- * DCF77_SerialTimeOutput
- * Ralf Bohnen, 2013
- * This example code is in the public domain.
+ * Skript for a real time clock within an old speedometer
  */
 
-/*---------------------------------------------------------------*/
+//*---------------------------------------------------------------*/
 /*include libraries----------------------------------------------*/
 /*---------------------------------------------------------------*/
 #include "Time.h"
@@ -51,7 +49,7 @@ int constNew = 1500;      /* default value for detection of new minute*/
 void setup() {
   Serial.begin(9600); 
   pinMode(LED_BUILTIN, OUTPUT);
-  Serial.println("Rebooting clock...");
+  Serial.println("Rebooting clock. This may take several minutes.");
 }
 
 /*---------------------------------------------------------------*/
@@ -70,13 +68,7 @@ void loop() {
       if (Up) {
         flankDown=millis();
         durationCycle = flankUp-PreviousflankUp;
-        Serial.print("Sek: ");
-        Serial.print(i);
-        Serial.print("\t\tCycle: ");
-        Serial.print(durationCycle);
         durationPulse = flankDown - flankUp;
-        Serial.print("\tPulse :");
-        Serial.print(durationPulse);
         PreviousflankUp = flankUp;
         if (durationPulse > (constHigh+constLow)/2)
           {typePulse = 1;
@@ -90,7 +82,6 @@ void loop() {
             code[j]=0;
           }
           i=0;
-        Serial.print("\n--------------------- ERROR DETECTED! ---------------------");
         }
         else
         {
@@ -98,14 +89,10 @@ void loop() {
          };
       
         Up = false;
-      Serial.print("\tSignal: ");
-      Serial.print(typePulse);
       if (durationCycle > constNew)
       {
         if(flagNewMinute)
         {
-          Serial.println("\n---------------------- Sucessful run ----------------------");
-          
           intMin = decodeDCF(code,21,7);
           intHour = decodeDCF(code,29,6);
           intDay = decodeDCF(code,36,6);
@@ -114,7 +101,7 @@ void loop() {
           intYear = 2000+decodeDCF(code,50,8);
 
           setTime(intHour,intMin,0,intDay,intMonth,intYear);
-          Serial.print("Neue Zeit erhalten : ");
+          Serial.print("Current time is : ");
           Serial.print(sprintTime()); 
           Serial.print("  "); 
           Serial.println(sprintDate());  
@@ -126,20 +113,13 @@ void loop() {
           }
         flagNewMinute = true;
         i = 0;
-        Serial.print("\n------------------- New minute detected -------------------");
         }
 
-    Serial.print("\t\tCode: ");
     if (flagNewMinute)
     {
       code[i] = typePulse;
       i++;
-      for(int j = 0; j < arrayLength; j++)
-        {
-          Serial.print(code[j]);
-        }
       };
-    Serial.println();
     digitalWrite(LED_BUILTIN, LOW);
  
       }              
